@@ -28,12 +28,13 @@ Welcome to the **Sparse Matrix Operations Library**, a lightweight C++ toolkit d
    * [Compiling the Code](#compiling-the-code)
    * [Running the Program](#running-the-program)
 5. [File Format & Sample Data](#-file-format--sample-data)
-6. [Project Structure](#-project-structure)
-7. [Algorithmic Details](#-algorithmic-details)
-8. [Performance & Efficiency](#-performance--efficiency)
-9. [Contributing](#-contributing)
-10. [License](#-license)
-11. [Contact & Support](#-contact--support)
+6. [Handling Header Mismatches](#-handling-header-mismatches)
+7. [Project Structure](#-project-structure)
+8. [Algorithmic Details](#-algorithmic-details)
+9. [Performance & Efficiency](#-performance--efficiency)
+10. [Contributing](#-contributing)
+11. [License](#-license)
+12. [Contact & Support](#-contact--support)
 
 ---
 
@@ -59,9 +60,8 @@ Welcome to the **Sparse Matrix Operations Library**, a lightweight C++ toolkit d
 
 ## 🛠️ Prerequisites
 
-* **Compiler**: `g++ (GCC) >= 4.8` or any C++11‑compliant compiler
+* **Compiler**: `g++ (GCC) >= 4.8` or any C++11-compliant compiler
 * **Platform**: Linux, macOS, or Windows (with MinGW/Cygwin)
-* **Memory**: Adequate RAM to hold your sparse data (large dense matrices discouraged)
 
 ---
 
@@ -84,8 +84,6 @@ Welcome to the **Sparse Matrix Operations Library**, a lightweight C++ toolkit d
 
    * Place your sample `.txt` files in `sample_inputs/`
 
-4. **Run the executable** (next section)
-
 ---
 
 ## 🎮 Usage Guide
@@ -93,23 +91,21 @@ Welcome to the **Sparse Matrix Operations Library**, a lightweight C++ toolkit d
 ### 🏗️ Compiling the Code
 
 ```bash
-# From the root directory
+# From the project root
 g++ -std=c++11 -O2 SparseMatrix.cpp -o sparse
 ```
-
-*The `-O2` flag optimizes for speed; remove if debugging.*
 
 ### ▶️ Running the Program
 
 ```bash
-# ./sparse
+# From the project root
+./sparse
 Choose operation: 1) Add  2) Subtract  3) Multiply
 Enter path to first matrix file: sample_inputs/A.txt
 Enter path to second matrix file: sample_inputs/B.txt
-# Result will be saved to result.txt
 ```
 
-* **Result File**: `result.txt` in the same format as input.
+* The program writes the result to `result.txt` in your current directory.
 
 ---
 
@@ -123,14 +119,36 @@ cols=5
 (3, 0, 7)
 ```
 
-* **rows**: Number of matrix rows
-* **cols**: Number of matrix columns
+* **rows**: Number of rows (0-based indices go from `0` to `rows-1`).
+* **cols**: Number of columns (0-based indices go from `0` to `cols-1`).
 * Each entry: `(row_index, col_index, value)`
-* Indices are **0-based**
 
-Sample data resides in `sample_inputs/`:
+Sample data in `sample_inputs/`: `.txt` files paired by matching dimensions for addition/subtraction, or appropriate shapes for multiplication.
 
-* `A.txt`, `B.txt`, …
+---
+
+## ⚠️ Handling Header Mismatches
+
+If you encounter **"Index out of bounds"** errors, it means your file’s `rows=` or `cols=` header is too small. To correct:
+
+1. **Find the true maxima**:
+
+   ```bash
+   awk -F'[(), ]+' '/\(/ { if ($2>r) r=$2; if ($3>c) c=$3 } END { print "maxr=" (r+1) " maxc=" (c+1) }' sample_inputs/your_file.txt
+   ```
+2. **Update the header**:
+
+   ```bash
+   sed -i 's/^rows=.*/rows=<maxr>/' sample_inputs/your_file.txt
+   sed -i 's/^cols=.*/cols=<maxc>/' sample_inputs/your_file.txt
+   ```
+3. **Re-run**:
+
+   ```bash
+   ./sparse
+   ```
+
+This ensures `rows` = maximum row index + 1, and `cols` = maximum column index + 1.
 
 ---
 
@@ -138,12 +156,14 @@ Sample data resides in `sample_inputs/`:
 
 ```
 📦 sparse-matrix
- ┣ 📂 sample_inputs
- ┃ ┣ 📄 A.txt
- ┃ ┗ 📄 B.txt
+ ┣ 📂 sample_inputs   ← Your matrix files (.txt)
+ ┃ ┣ 📄 easy_sample_03_1.txt
+ ┃ ┣ 📄 easy_sample_03_2.txt
+ ┃ ┣ 📄 matrixfile1.txt
+ ┃ ┗ 📄 matrixfile3.txt
  ┣ 📄 SparseMatrix.cpp
- ┣ 📄 result.txt      # Generated output
- ┣ 📄 README.md       # ← You are here!
+ ┣ 📄 result.txt      ← Generated output
+ ┣ 📄 README.md       ← You are here!
  ┗ 📄 LICENSE
 ```
 
@@ -151,46 +171,41 @@ Sample data resides in `sample_inputs/`:
 
 ## 🔍 Algorithmic Details
 
-1. **Parsing**: Reads header lines `rows=<n>`, `cols=<m>` and then entries `(r,c,v)`.
-2. **Storage**: Each row holds a sorted `std::vector<Entry>` for quick merge and lookup.
-3. **Addition/Subtraction**: Two‐pointer merge of the per‐row lists, summing or subtracting values; skips zeros.
-4. **Multiplication**: For each nonzero in `A[i][k]`, scan nonzeros in row `k` of `B`, accumulating products in result row `i`.
+1. **Parsing**: Reads `rows=`, `cols=` header and entries `(r,c,v)`.
+2. **Storage**: Each row holds a sorted `std::vector<Entry>`.
+3. **Addition/Subtraction**: Two-pointer merge per row, skipping zeros.
+4. **Multiplication**: Iterate nonzeros in A’s row, multiply with nonzeros in B’s corresponding rows.
 
 ---
 
 ## 🚀 Performance & Efficiency
 
-* **Time Complexity**:
-
-  * Addition/Subtraction: O(N<sub>A</sub> + N<sub>B</sub>) per row (N = nonzeros)
-  * Multiplication: O(∑<sub>i</sub> N<sub>A,i</sub> × log N<sub>R,i</sub> + N<sub>B,k</sub>)
-* **Memory**: O(total nonzero entries)
-
-*Benchmarks coming soon… stay tuned!* 🚀
+* **Addition/Subtraction**: O(N\_A + N\_B) per row (N = nonzeros).
+* **Multiplication**: O(∑*i N*{A,i}·logN\_{R,i} + N\_{B,k}).
+* **Memory**: O(total nonzeros).
 
 ---
 
 ## 🤝 Contributing
 
 1. Fork the repo
-2. Create a feature branch: `git checkout -b feature/YourFeature`
-3. Commit your changes: `git commit -m 'Add awesome feature'`
-4. Push to branch: `git push origin feature/YourFeature`
-5. Open a Pull Request
+2. Create a feature branch
+3. Commit & push your changes
+4. Open a Pull Request
 
-Please follow the [Google C++ Style Guide](https://google.github.io/styleguide/cppguide.html) and include unit tests.
+Follow the [Google C++ Style Guide](https://google.github.io/styleguide/cppguide.html) and include tests.
 
 ---
 
 ## 📝 License
 
-This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for details.
+This project is licensed under the **MIT License**. See [LICENSE](LICENSE).
 
 ---
 
 ## 📬 Contact & Support
 
-🤗 **Facilitator**: Dr. Data Structures (\[[wdebela@alueducation.com](mailto:email@example.com)])
+Facilitator: Dr. Data Structures (\[[wdebela@alueducation.com](mailto:email@example.com)])
 
-Feel free to open an issue or email for questions, suggestions, or to share your results. Happy Coding! 🎉
+Open an issue for questions or suggestions. Happy coding! 🎉
 
